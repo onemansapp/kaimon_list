@@ -1,205 +1,753 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>コンパス方向線マップ</title>
-
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>買い物メモ</title>
     <style>
-        html, body {
-            height: 100%;
+        * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
-        #map {
-            width: 100%;
-            height: 100%;
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            max-width: 600px;
+            margin: 0 auto;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-        /* 左下の丸いコンパスボタン */
-        #compassBtn {
+
+        /* ヘッダー（Toolbar風） */
+        .header {
+            background: #4CAF50;
+            color: white;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .menu-button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        /* ハンバーガーメニュー */
+        .menu-dropdown {
+            display: none;
             position: absolute;
-            left: 10px;
-            bottom: 80px;           /* 位置取得ボタンの上に被らないように */
-            width: 56px;
-            height: 56px;
+            right: 10px;
+            top: 60px;
             background: white;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             z-index: 1000;
+        }
+
+        .menu-dropdown.active {
+            display: block;
+        }
+
+        .menu-item {
+            padding: 16px 24px;
+            cursor: pointer;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .menu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        /* ナビゲーションタブ */
+        .nav-buttons {
+            display: flex;
+            background: white;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 12px;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            color: black;
+        }
+
+        .nav-btn.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        /* 入力エリア */
+        .input-area {
+            background: white;
+            padding: 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .input-box {
+            flex: 1;
+            min-width: 0;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .add-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
-            user-select: none;
+            flex-shrink: 0;
         }
-        #compassBtn:active {
-            background: #f0f0f0;
+
+        /* 画面 */
+        .screen {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* アイテムリスト */
+        .item-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .item {
+            background: white;
+            padding: 12px;
+            margin: 6px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            transition: transform 0.3s, opacity 0.3s;
+            cursor: move;
+            user-select: none;
+            touch-action: pan-y;
+        }
+
+        .item.completed {
+            opacity: 0.5;
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .item.dragging {
+            opacity: 0.5;
+            background: #e8f5e9;
+        }
+
+        .item.drag-over {
+            border-top: 3px solid #4CAF50;
+        }
+
+        .item.swiping {
+            transition: none;
+        }
+
+        /* 一括消去ボタン */
+        .clear-btn {
+            margin-top: 12px;
+    	    margin-left: 12px;
+            margin-right: 12px;
+            margin-bottom: 50px;
+            padding: 14px;
+            background: #ccc;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        /* モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .modal-btn.primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .modal-btn.secondary {
+            background: #e0e0e0;
+        }
+
+        .empty-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 16px;
+        }
+
+        /* 使い方画面 */
+        .usage-content {
+            line-height: 1.8;
+        }
+
+        .usage-content h2 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+
+        .usage-content h3 {
+            margin-top: 15px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .usage-content p {
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
+    <!-- ヘッダー -->
+    <div class="header">
+        <div class="header-title">買い物メモ</div>
+        <button class="menu-button" onclick="toggleMenu()">⋮</button>
+    </div>
 
-<div id="map"></div>
+    <!-- ハンバーガーメニュー -->
+    <div class="menu-dropdown" id="menuDropdown">
+        <div class="menu-item" onclick="showUsage()">使い方</div>
+    </div>
 
-<!-- コンパスボタン -->
-<div id="compassBtn" title="方向線を表示/非表示">🧭</div>
+    <!-- ナビゲーションタブ -->
+    <div class="nav-buttons">
+        <button class="nav-btn active" onclick="switchScreen('main')">メインメモ</button>
+        <button class="nav-btn" onclick="switchScreen('registered')">登録</button>
+        <button class="nav-btn" onclick="switchScreen('later')">後で買う</button>
+    </div>
 
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- メインメモ画面 -->
+    <div id="main-screen" class="screen active">
+        <div class="input-area">
+            <input type="text" class="input-box" id="main-input" placeholder="品目を追加（スペース区切りで複数可）">
+            <button class="add-btn" onclick="addItem('main')">+</button>
+        </div>
+        <div class="item-list" id="main-list"></div>
+        <button class="clear-btn" onclick="clearAllItems('main')">一括消去</button>
+    </div>
 
-<script>
-// 変数
-let map;
-let userMarker;
-let directionLine = null;        // 方向線（Polyline）
-let isLineVisible = false;
-let currentHeading = 0;          // 現在の向いている方向（度）
+    <!-- 登録画面 -->
+    <div id="registered-screen" class="screen">
+        <div class="input-area">
+            <input type="text" class="input-box" id="registered-input" placeholder="品目を追加（スペース区切りで複数可）">
+            <button class="add-btn" onclick="addItem('registered')">+</button>
+        </div>
+        <div class="item-list" id="registered-list"></div>
+        <button class="clear-btn" onclick="clearAllItems('registered')">一括消去</button>
+    </div>
 
-// 地図初期化
-function initMap() {
-    map = L.map('map').setView([35.681, 139.767], 16);
+    <!-- 後で買う画面 -->
+    <div id="later-screen" class="screen">
+        <div class="input-area">
+            <input type="text" class="input-box" id="later-input" placeholder="品目を追加（スペース区切りで複数可）">
+            <button class="add-btn" onclick="addItem('later')">+</button>
+        </div>
+        <div class="item-list" id="later-list"></div>
+        <button class="clear-btn" onclick="clearAllItems('later')">一括消去</button>
+    </div>
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    <!-- 削除確認モーダル -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <h3>削除確認</h3>
+            <p id="confirm-message">この項目を削除しますか？</p>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeConfirmModal()">キャンセル</button>
+                <button class="modal-btn primary" onclick="confirmDelete()">削除</button>
+            </div>
+        </div>
+    </div>
 
-    // 現在地取得
-    map.locate({ setView: true, maxZoom: 18, watch: true });
-}
+    <!-- 使い方モーダル -->
+    <div id="usage-modal" class="modal">
+        <div class="modal-content">
+            <div class="usage-content">
+                <h2>📝 基本操作</h2>
+                <h3>品目の追加</h3>
+                <p>1. 画面上部の入力欄に品名を入力<br>
+                2. 「+」ボタンまたはキーボードの完了ボタンを押す<br>
+                3. スペースで区切ると、複数の品目を一度に追加できます<br>
+                　例：「牛乳 卵 パン」→ 3つの品目として登録</p>
+                
+                <h2>🗂️ 3つの画面</h2>
+                
+                <h3>📌 メインメモ</h3>
+                <p>今日買う予定の品物を管理する画面です。</p>
+                <p>• <strong>ダブルタップ</strong>：チェック済みにして下部に移動（買った印）<br>
+                • <strong>左スワイプ</strong>：削除<br>
+                • <strong>右スワイプ</strong>：「後で買う」に移動</p>
+                
+                <h3>📋 登録</h3>
+                <p>よく買う品物を登録しておく画面です。</p>
+                <p>• <strong>右スワイプ</strong>：メインメモにコピー（登録には残る）<br>
+                • <strong>左スワイプ</strong>：削除</p>
+                
+                <h3>⏰ 後で買う</h3>
+                <p>今回は買わないけど、近いうちに買うかもしれない品物を保管する画面です。</p>
+                <p>• <strong>右スワイプ</strong>：メインメモに移動<br>
+                • <strong>左スワイプ</strong>：削除</p>
+                
+                <h2>🔄 便利な機能</h2>
+                
+                <h3>アイテムの並び替え</h3>
+                <p>品目を<strong>長押ししてドラッグ</strong>すると、好きな順番に並び替えできます</p>
+                
+                <h3>一括消去</h3>
+                <p>各画面下部の「<strong>一括消去</strong>」ボタンで、その画面の全アイテムを削除</p>
+                
+                <h2>💡 使い方のコツ</h2>
+                <p>1. <strong>登録画面を活用</strong>：牛乳、卵、パンなど、頻繁に買うものを登録しておくと便利<br>
+                2. <strong>後で買うを活用</strong>：「そのうち買いたい」ものは後で買うに保管<br>
+                3. <strong>チェック機能</strong>：買い物中はダブルタップでチェックしていくとわかりやすい<br>
+                4. <strong>並び替え</strong>：スーパーの売り場順に並べておくと買い物がスムーズ</p>
+                
+                <h2>⚠️ 注意事項</h2>
+                <p>• 各画面で同じ品名は1つしか登録できません（重複防止）<br>
+                • アプリを終了してもデータは保存されます<br>
+                • スワイプ操作は勢いよく行うと認識されやすいです</p>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn primary" onclick="closeUsage()">閉じる</button>
+            </div>
+        </div>
+    </div>
 
-// 位置取得成功時
-function onLocationFound(e) {
-    const radius = e.accuracy / 2;
+    <script>
+        let data = {
+            main: [],
+            registered: [],
+            later: []
+        };
 
-    if (!userMarker) {
-        userMarker = L.circle(e.latlng, radius).addTo(map);
-        L.marker(e.latlng).addTo(map)
-            .bindPopup("あなたはここ")
-            .openPopup();
-    } else {
-        userMarker.setLatLng(e.latlng);
-        userMarker.setRadius(radius);
-        map.setView(e.latlng);
-    }
+        let currentScreen = 'main';
+        let deleteTarget = null;
+        let deleteType = 'single';
+        let draggedItem = null;
 
-    // 現在地が取れたらコンパスイベントを有効化
-    enableCompass();
-}
-
-// 位置取得エラー
-function onLocationError(e) {
-    alert(e.message);
-}
-
-// コンパス（DeviceOrientation）の有効化
-function enableCompass() {
-    if (window.DeviceOrientationEvent) {
-        window.addEventListener('deviceorientation', handleOrientation);
-        
-        // iOS 13+ は許可が必要
-        if (DeviceOrientationEvent.requestPermission) {
-            document.getElementById('compassBtn').addEventListener('click', requestCompassPermission);
-        }
-    } else {
-        alert("この端末はコンパスに対応していません");
-    }
-}
-
-function requestCompassPermission() {
-    DeviceOrientationEvent.requestPermission()
-        .then(response => {
-            if (response === 'granted') {
-                window.addEventListener('deviceorientation', handleOrientation);
+        // データ読み込み
+        function loadData() {
+            const saved = localStorage.getItem('shoppingMemoData');
+            if (saved) {
+                data = JSON.parse(saved);
             }
-        })
-        .catch(console.error);
-}
-
-// 方向が変わったとき
-function handleOrientation(event) {
-    if (event.alpha !== null) {
-        // iOS と Android で向きの計算が少し違うが、webkitCompassHeading があればそれを使う
-        if (event.webkitCompassHeading !== undefined) {
-            currentHeading = event.webkitCompassHeading;  // iOS
-        } else {
-            currentHeading = 360 - event.alpha;           // Android（大体合ってる）
         }
 
-        // 線が表示されている状態ならリアルタイムで更新
-        if (isLineVisible && userMarker) {
-            drawDirectionLine();
+        // データ保存
+        function saveData() {
+            localStorage.setItem('shoppingMemoData', JSON.stringify(data));
         }
-    }
-}
 
-// 方向線を描く（1000m先まで）
-function drawDirectionLine() {
-    if (!userMarker) return;
-
-    const center = userMarker.getLatLng();
-    const distance = 1000000; // 1km先まで（十分長い）
-
-    // 目的地の緯度経度を計算（簡易版：地球を平面と仮定）
-    const bearing = currentHeading;
-    const R = 6371000; // 地球の半径（m）
-    const rad = bearing * Math.PI / 180;
-
-    const lat1 = center.lat * Math.PI / 180;
-    const lon1 = center.lng * Math.PI / 180;
-
-    const lat2 = Math.asin(
-        Math.sin(lat1) * Math.cos(distance / R) +
-        Math.cos(lat1) * Math.sin(distance / R) * Math.cos(rad)
-    );
-    const lon2 = lon1 + Math.atan2(
-        Math.sin(rad) * Math.sin(distance / R) * Math.cos(lat1),
-        Math.cos(distance / R) - Math.sin(lat1) * Math.sin(lat2)
-    );
-
-    const endLatLng = L.latLng(lat2 * 180 / Math.PI, lon2 * 180 / Math.PI);
-
-    if (directionLine) {
-        directionLine.setLatLngs([center, endLatLng]);
-    } else {
-        directionLine = L.polyline([center, endLatLng], {
-            color: 'orange',
-            weight: 6,
-            opacity: 0.9
-        }).addTo(map);
-    }
-}
-
-// ボタンクリックでトグル
-document.getElementById('compassBtn').addEventListener('click', function() {
-    if (!userMarker) {
-        alert("現在地がまだ取得できていません");
-        return;
-    }
-
-    isLineVisible = !isLineVisible;
-
-    if (isLineVisible) {
-        drawDirectionLine();
-        this.style.background = '#fff3e0';
-    } else {
-        if (directionLine) {
-            map.removeLayer(directionLine);
-            directionLine = null;
+        // メニュー表示切り替え
+        function toggleMenu() {
+            const menu = document.getElementById('menuDropdown');
+            menu.classList.toggle('active');
         }
-        this.style.background = 'white';
-    }
-});
 
-// イベント登録
-map.on('locationfound', onLocationFound);
-map.on('locationerror', onLocationError);
+        // メニュー外クリックで閉じる
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('menuDropdown');
+            const menuButton = document.querySelector('.menu-button');
+            if (!menu.contains(e.target) && e.target !== menuButton) {
+                menu.classList.remove('active');
+            }
+        });
 
-// 地図初期化
-initMap();
+        // 使い方表示
+        function showUsage() {
+            document.getElementById('menuDropdown').classList.remove('active');
+            document.getElementById('usage-modal').classList.add('active');
+        }
 
-</script>
+        function closeUsage() {
+            document.getElementById('usage-modal').classList.remove('active');
+        }
+
+        // 画面切り替え
+        function switchScreen(screen) {
+            currentScreen = screen;
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(`${screen}-screen`).classList.add('active');
+            event.target.classList.add('active');
+            
+            renderList();
+        }
+
+        // リスト描画
+        function renderList() {
+            const listEl = document.getElementById(`${currentScreen}-list`);
+            listEl.innerHTML = '';
+
+            const items = data[currentScreen];
+            
+            if (items.length === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'empty-message';
+                emptyMsg.textContent = '品目がありません';
+                listEl.appendChild(emptyMsg);
+                return;
+            }
+
+            // 完了アイテムを後ろに並べ替え（元のリストを直接並べ替える）
+            const activeItems = items.filter(item => !item.completed);
+            const completedItems = items.filter(item => item.completed);
+            
+            data[currentScreen] = [...activeItems, ...completedItems];
+
+            data[currentScreen].forEach((item) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'item' + (item.completed ? ' completed' : '');
+                itemEl.textContent = item.name;
+                itemEl.draggable = true;
+                itemEl.dataset.id = item.id;
+
+                setupItemEvents(itemEl, item);
+                listEl.appendChild(itemEl);
+            });
+        }
+
+        // アイテムイベント設定
+        function setupItemEvents(el, item) {
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let currentX = 0;
+            let lastTap = 0;
+            let isDraggingTouch = false;
+
+            // タッチイベント（スワイプ用）
+            el.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                currentX = 0;
+                isDraggingTouch = false;
+            });
+
+            el.addEventListener('touchmove', (e) => {
+                const deltaX = e.touches[0].clientX - touchStartX;
+                const deltaY = e.touches[0].clientY - touchStartY;
+
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+                    e.preventDefault();
+                    currentX = deltaX;
+                    el.style.transform = `translateX(${deltaX}px)`;
+                    el.classList.add('swiping');
+                    isDraggingTouch = true;
+                }
+            });
+
+            el.addEventListener('touchend', (e) => {
+                el.classList.remove('swiping');
+                
+                if (!isDraggingTouch) {
+                    const now = Date.now();
+                    if (now - lastTap < 300) {
+                        toggleComplete(item.id);
+                    }
+                    lastTap = now;
+                }
+
+                if (Math.abs(currentX) > 100) {
+                    if (currentX < 0) {
+                        deleteTarget = item.id;
+                        deleteType = 'single';
+                        document.getElementById('confirm-message').textContent = 'この項目を削除しますか？';
+                        document.getElementById('confirm-modal').classList.add('active');
+                    } else {
+                        moveItem(item.id);
+                    }
+                }
+                
+                el.style.transform = '';
+                isDraggingTouch = false;
+            });
+
+            // ドラッグ&ドロップイベント（並び替え用）
+            el.addEventListener('dragstart', (e) => {
+                draggedItem = item;
+                el.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', item.id);
+            });
+
+            el.addEventListener('dragend', () => {
+                el.classList.remove('dragging');
+                draggedItem = null;
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            });
+
+            el.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (!draggedItem) return;
+                
+                const dragging = document.querySelector('.dragging');
+                if (!dragging || dragging === el) return;
+
+                el.classList.add('drag-over');
+                
+                const listEl = el.parentElement;
+                const afterElement = getDragAfterElement(listEl, e.clientY);
+                
+                if (afterElement == null) {
+                    listEl.appendChild(dragging);
+                } else if (afterElement !== dragging) {
+                    listEl.insertBefore(dragging, afterElement);
+                }
+            });
+
+            el.addEventListener('dragleave', () => {
+                el.classList.remove('drag-over');
+            });
+
+            el.addEventListener('drop', (e) => {
+                e.preventDefault();
+                el.classList.remove('drag-over');
+                reorderItems();
+            });
+        }
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.item:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function reorderItems() {
+            const listEl = document.getElementById(`${currentScreen}-list`);
+            const newOrder = [...listEl.children]
+                .filter(el => el.classList.contains('item'))
+                .map(el => el.dataset.id);
+            data[currentScreen] = newOrder.map(id => data[currentScreen].find(item => item.id === id));
+            saveData();
+        }
+
+        // 完了切り替え
+        function toggleComplete(id) {
+            if (currentScreen !== 'main') return;
+            const item = data.main.find(i => i.id === id);
+            if (item) {
+                item.completed = !item.completed;
+                saveData();
+                renderList();
+            }
+        }
+
+        // アイテム移動
+        function moveItem(id) {
+            const position = data[currentScreen].findIndex(i => i.id === id);
+            if (position === -1) return;
+            
+            const item = data[currentScreen][position];
+
+            if (currentScreen === 'main') {
+                // メインメモ → 後で買う（移動）
+                if (!isDuplicateInList(data.later, item.name)) {
+                    data.later.push({
+                        id: Date.now().toString(),
+                        name: item.name,
+                        completed: false
+                    });
+                }
+                data[currentScreen].splice(position, 1);
+                
+            } else if (currentScreen === 'registered') {
+                // 登録 → メインメモ（コピー）
+                if (!isDuplicateInList(data.main, item.name)) {
+                    data.main.push({
+                        id: Date.now().toString(),
+                        name: item.name,
+                        completed: false
+                    });
+                }
+                
+            } else if (currentScreen === 'later') {
+                // 後で買う → メインメモ（移動）
+                if (!isDuplicateInList(data.main, item.name)) {
+                    data.main.push({
+                        id: Date.now().toString(),
+                        name: item.name,
+                        completed: false
+                    });
+                }
+                data[currentScreen].splice(position, 1);
+            }
+            
+            saveData();
+            renderList();
+        }
+
+        // アイテム追加
+        function addItem(screen) {
+            const input = document.getElementById(`${screen}-input`);
+            const text = input.value.trim();
+            
+            if (text) {
+                const items = text.split(/\s+/).filter(name => name.length > 0);
+                
+                items.forEach(name => {
+                    const exists = data[screen].some(item => item.name === name);
+                    
+                    if (!exists) {
+                        data[screen].push({
+                            id: Date.now().toString() + Math.random(),
+                            name: name,
+                            completed: false
+                        });
+                    }
+                });
+                
+                saveData();
+                renderList();
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        // 重複チェック
+        function isDuplicateInList(list, name) {
+            return list.some(item => item.name === name);
+        }
+
+        // 一括消去
+        function clearAllItems(screen) {
+            if (data[screen].length === 0) return;
+            
+            deleteType = 'all';
+            deleteTarget = screen;
+            document.getElementById('confirm-message').textContent = 
+                `全ての品目（${data[screen].length}件）を削除しますか？`;
+            document.getElementById('confirm-modal').classList.add('active');
+        }
+
+        // 削除確認
+        function confirmDelete() {
+            if (deleteType === 'single' && deleteTarget) {
+                const position = data[currentScreen].findIndex(i => i.id === deleteTarget);
+                if (position !== -1) {
+                    data[currentScreen].splice(position, 1);
+                }
+            } else if (deleteType === 'all' && deleteTarget) {
+                data[deleteTarget] = [];
+            }
+            
+            saveData();
+            renderList();
+            closeConfirmModal();
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.remove('active');
+            deleteTarget = null;
+            deleteType = 'single';
+        }
+
+        // Enterキーで追加
+        document.getElementById('main-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addItem('main');
+        });
+
+        document.getElementById('registered-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addItem('registered');
+        });
+
+        document.getElementById('later-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addItem('later');
+        });
+
+        // 初期化
+        loadData();
+        renderList();
+    </script>
 </body>
 </html>
