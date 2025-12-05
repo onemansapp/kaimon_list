@@ -293,7 +293,7 @@
 
     <!-- ナビゲーションタブ -->
     <div class="nav-buttons">
-        <button class="nav-btn active" onclick="switchScreen('main')">メインメモ</button>
+        <button class="nav-btn active" onclick="switchScreen('main')">メイン</button>
         <button class="nav-btn" onclick="switchScreen('registered')">登録</button>
         <button class="nav-btn" onclick="switchScreen('later')">後で買う</button>
     </div>
@@ -353,7 +353,7 @@
                 
                 <h2>🗂️ 3つの画面</h2>
                 
-                <h3>📌 メインメモ</h3>
+                <h3>📌 メイン</h3>
                 <p>今日買う予定の品物を管理する画面です。</p>
                 <p>• <strong>ダブルタップ</strong>：チェック済みにして下部に移動（買った印）<br>
                 • <strong>左スワイプ</strong>：削除<br>
@@ -361,12 +361,12 @@
                 
                 <h3>📋 登録</h3>
                 <p>よく買う品物を登録しておく画面です。</p>
-                <p>• <strong>右スワイプ</strong>：メインメモにコピー（登録には残る）<br>
+                <p>• <strong>右スワイプ</strong>：メインにコピー（登録には残る）<br>
                 • <strong>左スワイプ</strong>：削除</p>
                 
                 <h3>⏰ 後で買う</h3>
                 <p>今回は買わないけど、近いうちに買うかもしれない品物を保管する画面です。</p>
-                <p>• <strong>右スワイプ</strong>：メインメモに移動<br>
+                <p>• <strong>右スワイプ</strong>：メインに移動<br>
                 • <strong>左スワイプ</strong>：削除</p>
                 
                 <h2>🔄 便利な機能</h2>
@@ -631,7 +631,7 @@
             const item = data[currentScreen][position];
 
             if (currentScreen === 'main') {
-                // メインメモ → 後で買う（移動）
+                // メイン → 後で買う（移動）
                 if (!isDuplicateInList(data.later, item.name)) {
                     data.later.push({
                         id: Date.now().toString(),
@@ -642,7 +642,7 @@
                 data[currentScreen].splice(position, 1);
                 
             } else if (currentScreen === 'registered') {
-                // 登録 → メインメモ（コピー）
+                // 登録 → メイン（コピー）
                 if (!isDuplicateInList(data.main, item.name)) {
                     data.main.push({
                         id: Date.now().toString(),
@@ -652,7 +652,7 @@
                 }
                 
             } else if (currentScreen === 'later') {
-                // 後で買う → メインメモ（移動）
+                // 後で買う → メイン（移動）
                 if (!isDuplicateInList(data.main, item.name)) {
                     data.main.push({
                         id: Date.now().toString(),
@@ -751,3 +751,4 @@
     </script>
 </body>
 </html>
+
