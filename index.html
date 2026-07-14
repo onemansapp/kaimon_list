@@ -45,6 +45,37 @@
             padding: 8px;
         }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .save-button {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 8px 14px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .save-button:active {
+            transform: scale(0.95);
+            background: rgba(255,255,255,0.35);
+        }
+
+        .save-button.saving {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         /* ハンバーガーメニュー */
         .menu-dropdown {
             display: none;
@@ -304,7 +335,10 @@
     <!-- ヘッダー -->
     <div class="header">
         <div class="header-title">買い物メモ</div>
-        <button class="menu-button" onclick="toggleMenu()">⋮</button>
+        <div class="header-right">
+            <button class="save-button" id="manualSaveBtn" onclick="manualSave()">💾 保存</button>
+            <button class="menu-button" onclick="toggleMenu()">⋮</button>
+        </div>
     </div>
 
     <!-- ハンバーガーメニュー -->
@@ -451,25 +485,47 @@
         // データ保存（端末に保存し、次回起動時も残るようにする）
         let saveTimeout = null;
         async function saveData() {
+            pendingSaveCount++;
             try {
                 const result = await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
                 if (!result) {
                     console.error('保存に失敗しました');
-                    return;
+                    showSaveIndicator('保存に失敗しました', true);
+                    return false;
                 }
-                showSaveIndicator();
+                showSaveIndicator('保存しました', false);
+                return true;
             } catch (err) {
                 console.error('保存エラー:', err);
+                showSaveIndicator('保存に失敗しました', true);
+                return false;
+            } finally {
+                pendingSaveCount = Math.max(0, pendingSaveCount - 1);
             }
         }
 
-        function showSaveIndicator() {
+        function showSaveIndicator(message, isError) {
             const el = document.getElementById('saveIndicator');
+            el.textContent = message;
+            el.style.background = isError ? 'rgba(200,0,0,0.85)' : 'rgba(0,0,0,0.75)';
             el.classList.add('show');
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
                 el.classList.remove('show');
-            }, 900);
+            }, isError ? 2000 : 900);
+        }
+
+        // 手動保存ボタン：ヘッダーの「保存」ボタンから明示的に保存する
+        async function manualSave() {
+            const btn = document.getElementById('manualSaveBtn');
+            btn.classList.add('saving');
+            btn.textContent = '保存中...';
+            const ok = await saveData();
+            btn.classList.remove('saving');
+            btn.textContent = '💾 保存';
+            if (!ok) {
+                alert('保存に失敗しました。もう一度お試しください。');
+            }
         }
 
         // メニュー表示切り替え
@@ -796,6 +852,15 @@
 
         document.getElementById('later-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') addItem('later');
+        });
+
+        // 保存中にタブを閉じようとした場合は警告を出す（データ消失防止）
+        let pendingSaveCount = 0;
+        window.addEventListener('beforeunload', (e) => {
+            if (pendingSaveCount > 0) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
         });
 
         // 初期化（保存データを読み込んでから画面を描画）
