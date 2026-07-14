@@ -440,7 +440,8 @@
                 
                 <h2>⚠️ 注意事項</h2>
                 <p>• 各画面で同じ品名は1つしか登録できません（重複防止）<br>
-                • データはこのアプリ専用の保存領域に自動で保存され、次回開いたときもそのまま残ります<br>
+                • データはこのブラウザ（このサイト）に自動で保存され、同じブラウザで次回開いたときもそのまま残ります<br>
+                • ブラウザの履歴・データを消去したり、別のブラウザ／端末で開いたりすると、データは引き継がれません<br>
                 • スワイプ操作は勢いよく行うと認識されやすいです</p>
             </div>
             <div class="modal-buttons">
@@ -465,19 +466,19 @@
 
         const STORAGE_KEY = 'shoppingMemoData';
 
-        // データ読み込み（端末に保存された内容を復元）
+        // データ読み込み（ブラウザのlocalStorageに保存された内容を復元）
         async function loadData() {
             try {
-                const result = await window.storage.get(STORAGE_KEY, false);
-                if (result && result.value) {
-                    data = JSON.parse(result.value);
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    data = JSON.parse(saved);
                     // 念のため欠けているキーを補完
                     data.main = data.main || [];
                     data.registered = data.registered || [];
                     data.later = data.later || [];
                 }
             } catch (err) {
-                // キーがまだ存在しない（初回起動）場合はここに来る
+                // 保存データが壊れている、または初回起動の場合はここに来る
                 console.log('保存データが見つかりませんでした。新規作成します。', err);
             }
         }
@@ -487,12 +488,7 @@
         async function saveData() {
             pendingSaveCount++;
             try {
-                const result = await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
-                if (!result) {
-                    console.error('保存に失敗しました');
-                    showSaveIndicator('保存に失敗しました', true);
-                    return false;
-                }
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
                 showSaveIndicator('保存しました', false);
                 return true;
             } catch (err) {
