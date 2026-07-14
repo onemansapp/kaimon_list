@@ -277,6 +277,27 @@
         .usage-content p {
             margin-bottom: 10px;
         }
+
+        .save-indicator {
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(0,0,0,0.75);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            z-index: 3000;
+        }
+
+        .save-indicator.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -385,7 +406,7 @@
                 
                 <h2>⚠️ 注意事項</h2>
                 <p>• 各画面で同じ品名は1つしか登録できません（重複防止）<br>
-                • アプリを終了してもデータは保存されます<br>
+                • データはこのアプリ専用の保存領域に自動で保存され、次回開いたときもそのまま残ります<br>
                 • スワイプ操作は勢いよく行うと認識されやすいです</p>
             </div>
             <div class="modal-buttons">
@@ -393,6 +414,8 @@
             </div>
         </div>
     </div>
+
+    <div class="save-indicator" id="saveIndicator">保存しました</div>
 
     <script>
         let data = {
@@ -406,17 +429,47 @@
         let deleteType = 'single';
         let draggedItem = null;
 
-        // データ読み込み
-        function loadData() {
-            const saved = localStorage.getItem('shoppingMemoData');
-            if (saved) {
-                data = JSON.parse(saved);
+        const STORAGE_KEY = 'shoppingMemoData';
+
+        // データ読み込み（端末に保存された内容を復元）
+        async function loadData() {
+            try {
+                const result = await window.storage.get(STORAGE_KEY, false);
+                if (result && result.value) {
+                    data = JSON.parse(result.value);
+                    // 念のため欠けているキーを補完
+                    data.main = data.main || [];
+                    data.registered = data.registered || [];
+                    data.later = data.later || [];
+                }
+            } catch (err) {
+                // キーがまだ存在しない（初回起動）場合はここに来る
+                console.log('保存データが見つかりませんでした。新規作成します。', err);
             }
         }
 
-        // データ保存
-        function saveData() {
-            localStorage.setItem('shoppingMemoData', JSON.stringify(data));
+        // データ保存（端末に保存し、次回起動時も残るようにする）
+        let saveTimeout = null;
+        async function saveData() {
+            try {
+                const result = await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
+                if (!result) {
+                    console.error('保存に失敗しました');
+                    return;
+                }
+                showSaveIndicator();
+            } catch (err) {
+                console.error('保存エラー:', err);
+            }
+        }
+
+        function showSaveIndicator() {
+            const el = document.getElementById('saveIndicator');
+            el.classList.add('show');
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                el.classList.remove('show');
+            }, 900);
         }
 
         // メニュー表示切り替え
@@ -745,10 +798,11 @@
             if (e.key === 'Enter') addItem('later');
         });
 
-        // 初期化
-        loadData();
-        renderList();
+        // 初期化（保存データを読み込んでから画面を描画）
+        (async function init() {
+            await loadData();
+            renderList();
+        })();
     </script>
 </body>
 </html>
-
